@@ -171,7 +171,7 @@ NODE_OPTIONS="--max-old-space-size=1024" npm run build
 
 ```bash
 npm install -g pm2
-pm2 start npm --name "puno-appstore" -- start
+PORT=3333 pm2 start npm --name "puno-appstore" -- start
 ```
 
 Verify it's running:
@@ -181,7 +181,7 @@ pm2 status
 pm2 logs puno-appstore
 ```
 
-The app is now live at `http://159.89.166.23:3000`
+The app is now live at `http://159.89.166.23:3333`
 
 ### Persist across reboots
 
@@ -194,12 +194,23 @@ Run the command that `pm2 startup` prints (it sets up the systemd service).
 
 ---
 
-## 9. (Optional) Nginx Reverse Proxy
+## 9. Nginx Reverse Proxy for `applications.techatt.com`
 
-Serve on port 80 instead of 3000:
+Route the subdomain to the Next.js app running on port 3333.
 
 ```bash
 apt install -y nginx
+```
+
+**Disable the default site** (important — it will intercept requests otherwise):
+
+```bash
+rm /etc/nginx/sites-enabled/default
+```
+
+Create the config:
+
+```bash
 nano /etc/nginx/sites-available/puno-appstore
 ```
 
@@ -208,10 +219,10 @@ Paste:
 ```nginx
 server {
     listen 80;
-    server_name 159.89.166.23;
+    server_name applications.techatt.com;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3333;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -227,18 +238,18 @@ server {
 Enable it:
 
 ```bash
-ln -s /etc/nginx/sites-available/puno-appstore /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/puno-appstore /etc/nginx/sites-enabled/
 nginx -t
 systemctl restart nginx
 ```
 
-The app will be accessible at `http://159.89.166.23`.
+The app will be accessible at `http://applications.techatt.com`.
 
-### Add free SSL (requires a domain)
+### Add SSL
 
 ```bash
 apt install -y certbot python3-certbot-nginx
-certbot --nginx -d yourdomain.com
+certbot --nginx -d applications.techatt.com
 ```
 
 ---
@@ -248,7 +259,7 @@ certbot --nginx -d yourdomain.com
 ```bash
 ufw allow OpenSSH
 ufw allow 'Nginx Full'   # if using nginx
-ufw allow 3000            # if accessing directly without nginx
+ufw allow 3333            # if accessing directly without nginx
 ufw enable
 ```
 
@@ -294,7 +305,7 @@ scp -r ./public/apps root@159.89.166.23:~/var/www/puno-appstore/public/
 | Issue | Fix |
 |-------|-----|
 | `database "puno-appstore" does not exist` | The database name is `pocketapk`. Use `\c pocketapk` in psql. |
-| Port 3000 not accessible | Check: `ss -tlnp \| grep 3000` and `ufw status` |
+| Port 3333 not accessible | Check: `ss -tlnp \| grep 3333` and `ufw status` |
 | PostgreSQL connection refused | `systemctl status postgresql` |
 | Seed script fails | Verify `.env` has correct DB credentials and tables exist |
 | Build fails | Ensure Node.js 18+: `node -v` |
